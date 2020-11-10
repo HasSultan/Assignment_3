@@ -18,6 +18,8 @@ library(tidyverse)
 library(randomForest)
 #install.packages("ggvis")
 library(ggvis)
+#install.packages("RSQLite")
+library(RSQLite)
 #install.packages("DECIPHER")
 library(DECIPHER)
 #install.packages("shiny")
@@ -36,19 +38,19 @@ entrez_db_summary("nuccore")
 # We can also look at the various search fields within the nuccore database
 entrez_db_searchable("nuccore")
 
-# A search of the Rag1 gene in UniProt, a database for protein sequences, tells us that the gene is just over 1500bp in some species. Similarly, UniProt tells us that Rag2 is just over 500bp. We can restrict our search to between 400 and 2000bp to ensure we are getting the correct data and not overloading R. 
+# A search of the RAG1 gene in UniProt, a database for protein sequences, tells us that the gene is just over 1500bp in some species. Similarly, UniProt tells us that RAG2 is just over 500bp. We can restrict our search to between 400 and 2000bp to ensure we are getting the correct data and not overloading R. 
 
 # Let's get an overview of how to use entrez_search
 ?entrez_search
 
 # We can search NCBI and the nuccore database for our gene of interest for our taxonomic group. We have included restrictions on the length of sequences to be between 400 to 2000bp.
-Cyp_search <- entrez_search(db = "nuccore", term = "(Cyprinidae[ORGN] AND Rag1[Gene] AND 400:2000[SLEN]) NOT (genome[TITL])")
+Cyp_search <- entrez_search(db = "nuccore", term = "(Cyprinidae[ORGN] AND RAG1[Gene] AND 400:2000[SLEN]) NOT (genome[TITL])")
 
 # We can check the total number of hits
 Cyp_search$count
 
 # The sample size required for building a machine learning model is largely dependent on how different the sequences are between the genes and how many features are used. We can start off by using a 150 RAG1 genes and 150 RAG2 genes so that the data is easily retrieved through R. If this poses to be a problem in our classification, we can consider increasing our sample size.
-Cyp_search <- entrez_search(db = "nuccore", term = "(Cyprinidae[ORGN] AND Rag1[Gene] AND 400:2000[SLEN]) NOT (genome[TITL])", retmax=150)
+Cyp_search <- entrez_search(db = "nuccore", term = "(Cyprinidae[ORGN] AND RAG1[Gene] AND 400:2000[SLEN]) NOT (genome[TITL])", retmax=150)
 
 Cyp_search
 
@@ -65,12 +67,12 @@ Rag1_summary$`1910926681`$organism
 Rag1_summary$`1910926681`$taxid
 Rag1_summary$`1910926681`$genome
 
-# This data contains sequence information on the recombination activating protein 1 (Rag1) gene of the organism within the olive barb species. Here we can confirm that the gene and taxonomic group is correct.
+# This data contains sequence information on the recombination activating protein 1 (RAG1) gene of the organism within the olive barb species. Here we can confirm that the gene and taxonomic group is correct.
 
 # Now we can obtain sequence information using entrez_fetch
 ?entrez_fetch
 
-# Here we are specifying that we want to obtain the Rag1 gene information from Cyp_search in FASTA format 
+# Here we are specifying that we want to obtain the RAG1 gene information from Cyp_search in FASTA format 
 Rag1_fetch <- entrez_fetch(db = "nuccore", id = Cyp_search$ids, rettype = "fasta")
 
 # Check what class it is
@@ -82,23 +84,17 @@ head(Rag1_fetch)
 # Let's write this file to disk so we can look at it in a text editor
 write(Rag1_fetch, "Rag1_fetch.fasta", sep = "\n")
 
-# When looking at the Rag1 FASTA file in a text editor, I notice that it looks as it should with no excessively long sequences. Furthermore, it looks clean and free missing characters denoted by N.
+# When looking at the RAG1 FASTA file in a text editor, I notice that it looks as it should with no excessively long sequences. Furthermore, it looks clean and free missing characters denoted by N.
 
 # Now we can read it back in as a stringset 
 Rag1_stringSet <- readDNAStringSet("Rag1_fetch.fasta")
 
-# We can then create a data frame and organize our data frame more clearly by creating a column for our species name. We should now have a column with the title of the sequence, species name and sequence.
-Rag1df <- data.frame(Rag1_Title = names(Rag1_stringSet), Rag1_Sequence = paste(Rag1_stringSet))
-Rag1df$Species_Name <- word(Rag1df$Rag1_Title, 2L, 3L)
-Rag1df <- Rag1df[, c("Rag1_Title", "Species_Name", "Rag1_Sequence")]
+# We can then create a data frame and organize our data frame more clearly by creating a column for our species name. We should now have a data frame with the title of the sequence, species name, sequence, and gene.
+Rag1df <- data.frame(Title = names(Rag1_stringSet), Sequence = paste(Rag1_stringSet), Gene = "Rag1")
+Rag1df$Species_Name <- word(Rag1df$Title, 2L, 3L)
+Rag1df <- Rag1df[, c("Title", "Species_Name", "Sequence", "Gene")]
 
 # Check the data frame again to make sure it looks as it should
-view(Rag1df)
-
-# We can also make another column specifying that this database contains the RAG1 genes. This will be helpful later when building our random forest model
-Rag1df$Gene <- 'Rag1'
-
-# Check to make sure it looks correct and the new column has been added
 view(Rag1df)
 
 # Let's get rid of some of the data that we don't need in our environment
@@ -117,27 +113,12 @@ write(Rag2_fetch, "Rag2_fetch.fasta", sep = "\n")
 Rag2_stringSet <- readDNAStringSet("Rag2_fetch.fasta")
 
 # Similarly, we can create a data frame and organize our data frame more clearly by creating a column for our species name. We should now have a column with the title of the sequence, species name and sequence.
-Rag2df <- data.frame(Rag2_Title=names(Rag2_stringSet), Rag2_Sequence = paste(Rag2_stringSet))
-Rag2df$Species_Name <- word(Rag2df$Rag2_Title, 2L, 3L)
-Rag2df <- Rag2df[, c("Rag2_Title", "Species_Name", "Rag2_Sequence")]
+Rag2df <- data.frame(Title = names(Rag2_stringSet), Sequence = paste(Rag2_stringSet), Gene = "Rag2")
+Rag2df$Species_Name <- word(Rag2df$Title, 2L, 3L)
+Rag2df <- Rag2df[, c("Title", "Species_Name", "Sequence", "Gene")]
 
 # Let's look at the data frame.
 View(Rag2df)
-
-# We can add another column specifying the gene 
-Rag2df$Gene <- "Rag2"
-
-# Let's check to see if it has been done correctly
-view(Rag2df)
-
-# In order to merge our data frames, the data frame titles need to be the same. The column names are changed for both data frames so that they are the same and generalizable to both genes.
-setnames(Rag1df, old = c('Rag1_Title','Rag1_Sequence'), new = c('Title','Sequence'))
-
-setnames(Rag2df, old = c('Rag2_Title','Rag2_Sequence'), new = c('Title','Sequence'))
-
-# Let's take a look at both data frames to make sure the names have been changed
-view(Rag1df)
-view(Rag2df)
 
 # Now we can merge the two data frames so that we have one data frame called Rag_genes
 Rag_genes <- rbind(Rag1df, Rag2df)
@@ -147,24 +128,24 @@ rm(Rag1df, Rag2df, Rag2_search)
 
 #### - Preliminary Exploration ----
 
-# Let's ensure we have the correct number of observations. We have 150 Rag1 observations and 150 Rag2 observations so we should have a total of 300 observations
+# Let's ensure we have the correct number of observations. We have 150 RAG1 observations and 150 RAG2 observations so we should have a total of 300 observations
 dim(Rag_genes)
 
 # The length of DNA sequences can influence our k-mer frequency. Our search was previously limited to 400 to 2000bp, but we can also create a histogram to compare the distribution of sequence lengths between the two genes.
 
-# We are layering our distributions on the same graph to get a better comparison of the sequence length distributions.
-# We can plot the distribution of the Rag1 sequence lengths first specifying the range of x and y values. We have 150 sequences for each gene with lengths ranging from 400 to 2000. 
-hist(nchar(Rag_genes$Sequence[Rag_genes$Gene == "Rag1"]), col=rgb(1,0,0,0.5), xlim=(c(400, 2000)), ylim=(c(0, 150)), xlab="Sequence Length", 
-     ylab="Frequency", main="Distribution of Rag1 and Rag2 Sequence Lengths" )
+# We are layering our distributions on the same graph to get a better comparison of the sequence length distributions.We can plot the distribution of the RAG1 and RAG2 sequence lengths. We have 150 sequences for each gene with lengths ranging from 400 to 2000.
+ggplot(data = Rag_genes, aes(nchar(Sequence), fill=Gene)) + # specifying the data and assign colours by gene
+  geom_histogram(breaks=seq(500, 2000, by =100), #binwidth of 50
+                 col = "black", # outline colour
+                 size = 0.25, # outline size
+                 alpha = 0.6, # opacity of the bars
+                 position = "identity") + # overlaps the two histograms
+  scale_fill_manual(values = c(rgb(1,0,0,0.5), rgb(0,0,1,0.5))) + 
+  labs(x = "Sequence Length (bp)", y = "Frequency", title = expression(paste("Distribution of ", italic("Rag1"), " and ", italic("Rag2"), " Sequence Lengths"))) + # labels
+  theme(legend.text=(element_text(face="italic"))) + # italicizing the legend text
+  scale_x_continuous(limits = c(400, 2000)) # y-axis limits (gene lengths ranging from 400 to 2000)
 
-# Now we can plot the distribution for Rag2 sequence lengths specifying that we want to add this plot on top of the previous
-hist(nchar(Rag_genes$Sequence[Rag_genes$Gene == "Rag2"]), col=rgb(0,0,1,0.5), add=T)
-
-# Let's add a legend so we can distinguish between the two distributions
-legend("topright", legend=c("Rag1","Rag2"), col=c(rgb(1,0,0,0.5), rgb(0,0,1,0.5)), pt.cex=2, pch=15, title = "Genes" )
-
-
-# Here we notice that a majority of the RAG1 and Rag2 genes are  between 1000 to 1500bp. There is a bit of variability in the RAG1 genes with sequence lengths present between 500 to 1000bp, while none of the RAG2 genes are under 1000bp. This is something to keep in mind when we conduct our downstream analysis as the variability in sequence lengths of the RAG1 gene could influence our classification. Furthermore, there seems to be an outlier in the RAG2 gene sequence lengths. While outliers can be a result of improper data collection or storage, they can also be informative and indicate variability. For now we can keep this range and explore how if it affects our data.
+# Here we notice that a majority of the RAG1 and RAG2 genes are  between 1000 to 1500bp. There is a bit of variability in the RAG1 genes with sequence lengths present between 500 to 1000bp, while none of the RAG2 genes are under 1000bp. This is something to keep in mind when we conduct our downstream analysis as the variability in sequence lengths of the RAG1 gene could influence our classification. Furthermore, there seems to be an outlier in the RAG2 gene sequence lengths. While outliers can be a result of improper data collection or storage, they can also be informative and indicate variability. For now we can keep this range and explore how if it affects our data.
 
 # Let's look at some summary information regarding the min, max, median, first and third quartiles for the sequence lengths
 summary(nchar(Rag_genes$Sequence[Rag_genes$Gene == "Rag1"]))
@@ -230,7 +211,7 @@ Rag_validation <- Rag_genes %>%
   group_by(Gene) %>%
   sample_n(35)
 
-# We have our validation data set with 35 Rag1 gene sequences and 35 Rag2 gene sequences
+# We have our validation data set with 35 RAG1 gene sequences and 35 RAG2 gene sequences
 table(Rag_validation$Gene)
 
 # We can set our seed again for the for reproducibility
@@ -245,25 +226,30 @@ Rag_training <- Rag_genes %>%
 # Let's make sure we have equal records of each gene
 table(Rag_training$Gene)
 
+# To test a variety of predictors, we can make a function called classifiertrial. The argument test is used to specify which variables (column numbers) to use as predictors for classifying genes. 
+classifiertrial <- function(test){
+randomForest(x = Rag_training[,test], y=as.factor(Rag_training$Gene), ntree=1000, importance=TRUE)
+}
+
 # Let's take a look at variable names to see which variables to use for our classifier
 names(Rag_training)
 
-# We can start off by using our A, G, T and C proportions as predictors for classifying the genes
-Rag_gene_classifier_simple <- randomForest(x = Rag_training[, 9:12], y = as.factor(Rag_training$Gene), ntree = 1000, importance = TRUE)
+# From looking at the variable names (columns), we can make a list object with each set of predictors we would like to test for classifying the genes.
+test_predictors <- list( AGTCprop = 9:12, # A, G, T and C proportions
+                         AGTCdinucl = 9:28, #A, G, T and C proportions with dinucleotide sequences
+                         trinucl = 29:92) #trinucleotide sequences
 
-# Let's take a look at our results
-Rag_gene_classifier_simple
+# Using lapply(), we can test each set of predictors (from test_predictors) using our classifiertrial(test) function.
+results <- lapply(test_predictors, classifiertrial)
 
-# This worked pretty well! Only one of the RAG2 genes was misclassified. 
-
-# Let's use our dinucleotide sequences as well to see how it affects our performance
-Rag_gene_classifier2 <- randomForest(x = Rag_training[, 9:28], y = as.factor(Rag_training$Gene), ntree = 1000, importance = TRUE)
-
-Rag_gene_classifier2
-# Perfect performance
+#Can view all the results or individual results by indexing.
+results
+results[["AGTCprop"]] # This worked pretty well! Only one of the RAG2 genes was misclassified. 
+results[["AGTCdinucl"]] # Perfect performance
+results[["trinucl"]] # Perfect as well
 
 # We can take a look to see how the classifier for the dinucleotide sequences performs on unseen data 
-predic_valid <- predict(Rag_gene_classifier2, Rag_validation[, c(4, 9:28)])
+predic_valid <- predict(results[["AGTCdinucl"]], Rag_validation[, c(4, 9:28)])
 
 # Let's take a look at the class of our predic_valid object
 predic_valid
@@ -281,16 +267,12 @@ varImpPlot(Rag_gene_classifier2, main = "Feature Importance for Rag Gene Classif
 
 # The VarImpPlot function gives us the MeanDecreaseAccuracy and MeanDecreaseGini plots with features on the y-axis and measures on the x-axis. On the left we have our MeanDecreaseAccuracy plot which tells us the decrease in the accuracy of our model is most affected by the removal of the feature GA. Similarly, the MeanDecreaseGini is another measure of variable importance for estimating a target variable.A higher MeanDecreaseGini indicates higher feature importance. Both plots indicate that GA and C proportion are the most important features in classification of the RAG genes. 
 
-# Let's look at just the GA and Cproportion features
-Rag_gene_classifierGA <- randomForest(x = Rag_training[, 21], y = as.factor(Rag_training$Gene), ntree = 1000, importance = TRUE)
+# Let's look at just the GA and C proportion features
+results2 <- lapply(list(GA = 21, C = 12), classifiertrial)
 
-Rag_gene_classifierGA
-# This model with only GA as a feature had 0% error rate!
+results2[["GA"]] # This model with only GA as a feature had 0% error rate!
+results2[["C"]] # Similarly, the model with only C proportions had an error rate of 0.43%
 
-Rag_gene_classifierC <- randomForest(x = Rag_training[, 12], y = as.factor(Rag_training$Gene), ntree = 1000, importance = TRUE)
-
-Rag_gene_classifierC
-# Similarly, the model with only C proportions had an error rate of 0.43%
 
 ##### - Conclusion ----
 
