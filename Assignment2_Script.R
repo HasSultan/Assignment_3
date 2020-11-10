@@ -273,6 +273,27 @@ results2 <- lapply(list(GA = 21, C = 12), classifiertrial)
 results2[["GA"]] # This model with only GA as a feature had 0% error rate!
 results2[["C"]] # Similarly, the model with only C proportions had an error rate of 0.43%
 
+# We can compare the two most and two least important features for classifier accuracy (GA, C, GG, and TC) between RAG1 and RAG2 using a T test. 
+t.test(Rag_genes[Rag_genes$Gene == "Rag1", "GA"], Rag_genes[Rag_genes$Gene == "Rag2", "GA"])
+t.test(Rag_genes[Rag_genes$Gene == "Rag1", "Cprop"], Rag_genes[Rag_genes$Gene == "Rag2", "Cprop"])
+t.test(Rag_genes[Rag_genes$Gene == "Rag1", "GG"], Rag_genes[Rag_genes$Gene == "Rag2", "GG"])
+t.test(Rag_genes[Rag_genes$Gene == "Rag1", "TC"], Rag_genes[Rag_genes$Gene == "Rag2", "TC"])
+# Focusing on only the p-values, we can see that all four p-values are < 0.05, but GA and C have incredibly low p-values (<2.2e-16) compared to GG (2.895e-05) and TC (0.004623).
+
+# We can visualize this using boxplots
+# Before plotting, the data will need to be reformatted. Here, a new data frame, Rag_subset, is made holding the gene name, the specific k-mers of interest, and its proportions in the sequence.
+Rag_subset <- rbind(data.frame(Gene = Rag_genes$Gene, kmer = "GA", Prop = Rag_genes$GA),
+      data.frame(Gene = Rag_genes$Gene, kmer = "C", Prop = Rag_genes$Cprop),
+      data.frame(Gene = Rag_genes$Gene, kmer = "GG", Prop = Rag_genes$GG),
+      data.frame(Gene = Rag_genes$Gene, kmer = "TC", Prop = Rag_genes$TC))
+
+# Using Rag_subset, make the boxplots to compare these k-mer proportions for each gene.
+ggplot(data = Rag_subset, aes(fill=kmer)) +
+  geom_boxplot(aes(x = Gene, y= Prop), lwd=0.3, alpha = 0.8) +
+  facet_grid(kmer~., scale = "free") + 
+  labs(title = expression(paste("Most and Least Important Features for ", italic("Rag"), " Classification")), y = "Frequency (%)") + 
+  theme(axis.text.x = (element_text(face="italic")))
+# Notice from the boxplots how the median for C and GA differ between genes more so than the medians for FF and TC.
 
 ##### - Conclusion ----
 
