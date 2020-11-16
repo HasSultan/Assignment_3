@@ -293,7 +293,7 @@ ggplot(data = Rag_subset, aes(fill=kmer)) +
   facet_grid(kmer~., scale = "free") + 
   labs(title = expression(paste("Most and Least Important Features for ", italic("Rag"), " Classification")), y = "Frequency (%)") + 
   theme(axis.text.x = (element_text(face="italic")))
-# Notice from the boxplots how the median for C and GA differ between genes more so than the medians for FF and TC.
+# Notice from the boxplots how the median for C and GA differ between genes more so than the medians for GG and TC.
 
 ##### - Conclusion ----
 
